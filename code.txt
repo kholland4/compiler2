@@ -1,0 +1,31 @@
+int x = 1;
+int y = 2;
+int i = x + y + 5;
+
+while(i <= 10) {
+  asm {
+    chigh 0 0 4
+    clow 0 0 4
+    chigh 0 0 5
+    clow 0 104 5
+    busw 4 5 0
+  }
+  i = i + 1;
+}
+
+asm {
+  chigh 0 0 4
+  clow 0 0 4
+  
+  chigh 0 0 5
+  clow 0 105 5
+  busw 4 5 0
+  
+  chigh 0 0 5
+  clow 0 10 5
+  busw 4 5 0
+}
+
+int add(int x, int y) {
+  return x + y;
+}
