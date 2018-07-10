@@ -1,0 +1,36 @@
+Instruction format: OPCODE-- INPUTA-- INPUTB-- OUTPUT--
+Math is two's complement.
+
+TODO: flags - carry bit
+
+00	noop	do nothing
+
+01	chigh		write the values A (high byte) and B (low byte) to the upper half of rQ
+02	clow		write the values A (high byte) and B (low byte) to the lower half of rQ
+
+03	stor		copy rA to memory @ rB
+04	load		copy a word of memory @ rB to rQ
+
+05	jmp			jump to rB
+06	branch	if the low bit of rA is high, jump to rB
+07	local		set the address space offset to rA bytes and jump to instruction 0
+
+08	busr		read from bus at address rA -> rQ
+09	busw		write to bus at address rA with data rB
+
+---ALU---
+128		add		rA + rB -> rQ
+129   addc  rA + rB with carry in -> rQ
+
+130		and		rA & rB -> rQ
+131		or		rA | rB -> rQ
+132		not		~rA -> rQ
+133		xor		rA ^ rB -> rQ
+
+134		eq		set rQ to rA == rB
+135		gt		set rQ to rA > rB
+
+136		bsl		rA << 1 -> rQ
+137		bsr		rA >> 1 -> rQ
+
+138		copy	copy rA to rQ
