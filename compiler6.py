@@ -2,6 +2,7 @@
 import sys, string, math
 
 FLAG_WORD_SIZE = 4
+FLAG_WORD_BITS = 2
 FLAG_ILEN = 4
 
 code = ""
@@ -123,12 +124,18 @@ while i < len(code):
         if sread(i + 1) == "=":
             program.append(Symbol("op", "<=", "compare"))
             i += 2
+        elif sread(i + 1) == "<":
+            program.append(Symbol("op", "<<"))
+            i += 2
         else:
             program.append(Symbol("op", "<", "compare"))
             i += 1
     elif char == ">":
         if sread(i + 1) == "=":
             program.append(Symbol("op", ">=", "compare"))
+            i += 2
+        elif sread(i + 1) == ">":
+            program.append(Symbol("op", ">>"))
             i += 2
         else:
             program.append(Symbol("op", ">", "compare"))
@@ -627,6 +634,22 @@ def subexpr(mmap, vars, tmp, expr, outptr):
             out.append(ASM("and", FLAG_GREG, FLAG_GREG + 1, FLAG_GREG + 2))
         elif op == "^":
             out.append(ASM("xor", FLAG_GREG, FLAG_GREG + 1, FLAG_GREG + 2))
+        elif op == "<<":
+            out.extend(const(0, FLAG_GREG + 2))
+            jmpTag = getJumpTag()
+            out.append(ASM("bsl", FLAG_GREG, 0, FLAG_GREG, jmpFrom = jmpTag))
+            out.extend(const(1, FLAG_GREG + 3))
+            out.append(ASM("add", FLAG_GREG + 2, FLAG_GREG + 3, FLAG_GREG + 2))
+            out.append(ASM("eq", FLAG_GREG + 1, FLAG_GREG + 2, FLAG_GREG + 3))
+            out.append(ASM("not", FLAG_GREG + 3, 0, FLAG_GREG + 3))
+            out.append(ASM("chigh", 0, 0, FLAG_GREG + 4, jmpTo = jmpTag)) #FIXME FIXME FIXME register limit exceeded
+            out.append(ASM("clow", 0, 0, FLAG_GREG + 4, jmpTo = jmpTag)) #FIXME FIXME FIXME register limit exceeded
+            out.append(ASM("branch", FLAG_GREG + 3, FLAG_GREG + 4, 0))
+            out.append(ASM("copy", FLAG_GREG, 0, FLAG_GREG + 2))
+            
+        elif op == ">>":
+            out.append(ASM("bsr", FLAG_GREG, 0, FLAG_GREG + 2))
+        
         elif op == "&&": #FIXME
             out.append(ASM("and", FLAG_GREG, FLAG_GREG + 1, FLAG_GREG + 3))
             out.extend(const(1, FLAG_GREG))
@@ -651,7 +674,7 @@ def subexpr(mmap, vars, tmp, expr, outptr):
             out.append(ASM("gt", FLAG_GREG + 2, FLAG_GREG, FLAG_GREG + 1))
             out.append(ASM("eq", FLAG_GREG, FLAG_GREG + 2, FLAG_GREG + 3))
             out.append(ASM("or", FLAG_GREG + 1, FLAG_GREG + 3, FLAG_GREG + 2))
-        #TODO: all ops --------------------------------------------------------------------------------------------------------------------------------------------------------------------------IMPORTANT TODO
+        #TODO: all ops -------------------------------------------------------------------------------------------------------------------------------------------------------------------------IMPORTANT TODO
         
         out.extend(const(outptr, FLAG_GREG))
         out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 1))
@@ -713,6 +736,12 @@ def subexpr(mmap, vars, tmp, expr, outptr):
                 if expr[i].type == "paren":
                     expr[i] = Symbol("ptr", outptr2)
                 elif expr[i].type == "bracket":
+                    out.extend(const(outptr2, FLAG_GREG))
+                    out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG))
+                    out.append(ASM("load", 0, FLAG_GREG, FLAG_GREG + 1))
+                    for n in range(FLAG_WORD_BITS):
+                        out.append(ASM("bsl", FLAG_GREG + 1, 0, FLAG_GREG + 1))
+                    out.append(ASM("stor", FLAG_GREG + 1, FLAG_GREG, 0))
                     expr[i] = Symbol("arrayOffsetPtr", outptr2)
                 
                 i += 1
@@ -828,6 +857,13 @@ def process(symbols, mmap = [], vars = [], isGlobal = False):
             iExpr = symbols[i + 1].value[0]
             indexPtr = alloc(mmap, FLAG_WORD_SIZE)
             asm.extend(parseExpr(mmap, vars, iExpr, indexPtr))
+            
+            asm.extend(const(indexPtr, FLAG_GREG))
+            asm.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG))
+            asm.append(ASM("load", 0, FLAG_GREG, FLAG_GREG + 1))
+            for n in range(FLAG_WORD_BITS):
+                asm.append(ASM("bsl", FLAG_GREG + 1, 0, FLAG_GREG + 1))
+            asm.append(ASM("stor", FLAG_GREG + 1, FLAG_GREG, 0))
             
             var = getvar(vars, name)
             if not var.isArray:
