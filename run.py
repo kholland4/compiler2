@@ -10,6 +10,13 @@ mem = bytearray([])
 for i in range(65536):
     mem.append(0)
 
+disk = []
+with open("data.img", "rb") as f:
+    dataByte = f.read(1)
+    while dataByte and len(disk) < 256 * 1024:
+        disk.append(int(ord(dataByte)))
+        dataByte = f.read(1)
+
 with open(sys.argv[1], "rb") as f:
     i = 0
     d = f.read(1)
@@ -31,6 +38,8 @@ def regwrite(num, data):
     reg[num][2] = int((data >> 8) & 255)
     reg[num][3] = int(data & 255)
 
+busBuffer = 0
+
 def busw(addr, data):
     if addr == 0: #stdio
         sys.stdout.write(chr(data))
@@ -38,6 +47,12 @@ def busw(addr, data):
     elif addr == 1: #control
         if data == 0:
             sys.exit()
+    elif addr == 2: #disk
+        if addr >= 0 and addr < len(disk):
+            busBuffer = disk[addr]
+
+def busr():
+    return busBuffer
 
 while True:
     iindex = pos + offset
@@ -80,7 +95,7 @@ while True:
         pos = 0
         increment = False
     elif opcode == 8: #busr
-        pass #TODO
+        regwrite(regQ, busr())
     elif opcode == 9: #busw
         busw(regread(regA), regread(regB))
     elif opcode == 128: #add
