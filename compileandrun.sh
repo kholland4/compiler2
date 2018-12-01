@@ -1,2 +1,2 @@
 #!/bin/bash
-python3 compiler2.py code.txt > asm.txt && python3 assembler.py asm.txt && python3 run.py program.bin
+python3 compiler6.py $1 > asm.txt && python3 assembler.py asm.txt && python3 run.py program.bin
