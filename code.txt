@@ -1,31 +1,37 @@
-int x = 1;
-int y = 2;
-int i = x + y + 5;
-
-while(i <= 10) {
+void printChar(int char) {
   asm {
     chigh 0 0 4
+    clow 0 12 4
+    add 1 4 4
+    load 0 4 5
+    
+    chigh 0 0 4
     clow 0 0 4
-    chigh 0 0 5
-    clow 0 104 5
     busw 4 5 0
   }
+}
+void printLetterA(int times) {
+  int i = 0;
+  while(i < times) {
+    printChar('A');
+    i = i + 1;
+  }
+}
+int add(int x, int y) {
+  __RETURN__ = x + y;
+}
+
+int x = 1;
+int y = 2;
+int i = add(x, y) + 5;
+
+
+while(i <= 10) {
+  printChar('h');
   i = i + 1;
 }
 
-asm {
-  chigh 0 0 4
-  clow 0 0 4
-  
-  chigh 0 0 5
-  clow 0 105 5
-  busw 4 5 0
-  
-  chigh 0 0 5
-  clow 0 10 5
-  busw 4 5 0
-}
+printLetterA(2);
 
-int add(int x, int y) {
-  return x + y;
-}
+printChar('i');
+printChar(10);
