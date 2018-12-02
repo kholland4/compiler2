@@ -625,8 +625,23 @@ def subexpr(mmap, vars, tmp, expr, outptr):
             #TODO
             pass
         elif op == "*":
-            #TODO
-            pass
+            out.extend(const(0, FLAG_GREG + 2)) #output
+            out.extend(const(0, FLAG_GREG + 3)) #counter
+            #check for multiply by zero
+            jmpSkip = getJumpTag()
+            out.append(ASM("eq", FLAG_GREG + 1, FLAG_GREG + 2, FLAG_GREG + 4)) #FIXME
+            out.append(ASM("chigh", 0, 0, FLAG_GREG + 5, jmpTo = jmpSkip)) #FIXME
+            out.append(ASM("clow", 0, 0, FLAG_GREG + 5, jmpTo = jmpSkip)) #FIXME
+            out.append(ASM("branch", FLAG_GREG + 4, FLAG_GREG + 5, 0)) #FIXME
+            jmpTag = getJumpTag()
+            out.append(ASM("add", FLAG_GREG, FLAG_GREG + 2, FLAG_GREG + 2, jmpFrom = jmpTag))
+            out.extend(const(1, FLAG_GREG + 4)) #FIXME
+            out.append(ASM("add", FLAG_GREG + 3, FLAG_GREG + 4, FLAG_GREG + 3)) #FIXME
+            out.append(ASM("gt", FLAG_GREG + 1, FLAG_GREG + 3, FLAG_GREG + 4)) #FIXME
+            out.append(ASM("chigh", 0, 0, FLAG_GREG + 5, jmpTo = jmpTag)) #FIXME FIXME FIXME register limit exceeded
+            out.append(ASM("clow", 0, 0, FLAG_GREG + 5, jmpTo = jmpTag)) #FIXME FIXME FIXME register limit exceeded
+            out.append(ASM("branch", FLAG_GREG + 4, FLAG_GREG + 5, 0)) #FIXME
+            out.append(ASM("noop", jmpFrom = jmpSkip))
         elif op == "/":
             #TODO
             pass
@@ -651,9 +666,18 @@ def subexpr(mmap, vars, tmp, expr, outptr):
             out.append(ASM("clow", 0, 0, FLAG_GREG + 4, jmpTo = jmpTag)) #FIXME FIXME FIXME register limit exceeded
             out.append(ASM("branch", FLAG_GREG + 3, FLAG_GREG + 4, 0))
             out.append(ASM("copy", FLAG_GREG, 0, FLAG_GREG + 2))
-            
         elif op == ">>":
-            out.append(ASM("bsr", FLAG_GREG, 0, FLAG_GREG + 2))
+            out.extend(const(0, FLAG_GREG + 2))
+            jmpTag = getJumpTag()
+            out.append(ASM("bsr", FLAG_GREG, 0, FLAG_GREG, jmpFrom = jmpTag))
+            out.extend(const(1, FLAG_GREG + 3))
+            out.append(ASM("add", FLAG_GREG + 2, FLAG_GREG + 3, FLAG_GREG + 2))
+            out.append(ASM("eq", FLAG_GREG + 1, FLAG_GREG + 2, FLAG_GREG + 3))
+            out.append(ASM("not", FLAG_GREG + 3, 0, FLAG_GREG + 3))
+            out.append(ASM("chigh", 0, 0, FLAG_GREG + 4, jmpTo = jmpTag)) #FIXME FIXME FIXME register limit exceeded
+            out.append(ASM("clow", 0, 0, FLAG_GREG + 4, jmpTo = jmpTag)) #FIXME FIXME FIXME register limit exceeded
+            out.append(ASM("branch", FLAG_GREG + 3, FLAG_GREG + 4, 0))
+            out.append(ASM("copy", FLAG_GREG, 0, FLAG_GREG + 2))
         
         elif op == "&&": #FIXME
             out.append(ASM("and", FLAG_GREG, FLAG_GREG + 1, FLAG_GREG + 3))
@@ -665,6 +689,11 @@ def subexpr(mmap, vars, tmp, expr, outptr):
             out.append(ASM("and", FLAG_GREG, FLAG_GREG + 3, FLAG_GREG + 2))
         elif op == "==":
             out.append(ASM("eq", FLAG_GREG, FLAG_GREG + 1, FLAG_GREG + 2))
+        elif op == "!=":
+            #asm.extend(const(1, FLAG_GREG + 3))
+            out.append(ASM("eq", FLAG_GREG, FLAG_GREG + 1, FLAG_GREG + 2))
+            out.append(ASM("not", FLAG_GREG + 2, 0, FLAG_GREG + 2))
+            #out.append(ASM("and", FLAG_GREG + 2, FLAG_GREG + 3, FLAG_GREG + 2))
         elif op == ">":
             out.append(ASM("gt", FLAG_GREG, FLAG_GREG + 1, FLAG_GREG + 2))
         elif op == "<":
@@ -900,7 +929,10 @@ def process(symbols, mmap = [], vars = [], isGlobal = False):
             asm.extend(const(indexPtr, FLAG_GREG))
             asm.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG))
             asm.append(ASM("load", 0, FLAG_GREG, FLAG_GREG + 2))
-            asm.append(ASM("add", FLAG_GREG + 2, FLAG_SPTR, FLAG_GREG))
+            if var.isGlobal:
+                asm.append(ASM("add", FLAG_GREG + 2, FLAG_GSPTR, FLAG_GREG))
+            else:
+                asm.append(ASM("add", FLAG_GREG + 2, FLAG_SPTR, FLAG_GREG))
             asm.append(ASM("stor", FLAG_GREG + 1, FLAG_GREG, 0))
             
             dealloc(mmap, ptr)

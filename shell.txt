@@ -1,0 +1,125 @@
+int diskRead(int addr) {
+  asm {
+    chigh 0 0 4
+    clow 0 12 4
+    add 1 4 4
+    load 0 4 5
+    
+    chigh 0 0 4
+    clow 0 2 4
+    busw 4 5 0
+    busr 0 0 5
+    
+    chigh 0 0 4
+    clow 0 16 4
+    add 1 4 4
+    stor 5 4 0
+  }
+}
+void printChar(int char) {
+  asm {
+    chigh 0 0 4
+    clow 0 12 4
+    add 1 4 4
+    load 0 4 5
+    
+    chigh 0 0 4
+    clow 0 0 4
+    busw 4 5 0
+  }
+}
+
+printChar('B');
+printChar(diskRead(1));
+
+printChar(3 * 9);
+
+int partitionOffset = 0;
+int BPBOffset = partitionOffset + 11;
+
+int BPB_BytesPerSector = (diskRead(BPBOffset + 1) << 8) | diskRead(BPBOffset);
+int BPB_SectorsPerCluster = diskRead(BPBOffset + 2);
+int BPB_ReservedSectors = (diskRead(BPBOffset + 4) << 8) | diskRead(BPBOffset + 3);
+int BPB_NumFATs = diskRead(BPBOffset + 5);
+int BPB_MaxRootDirEntries = (diskRead(BPBOffset + 7) << 8) | diskRead(BPBOffset + 6);
+
+int BPB_TotalLogicalSectors = (diskRead(BPBOffset + 9) << 8) | diskRead(BPBOffset + 8);
+if(BPB_TotalLogicalSectors == 0) {
+  BPB_TotalLogicalSectors = (diskRead(BPBOffset + 24) << 24) | (diskRead(BPBOffset + 23)) << 16 | (diskRead(BPBOffset + 22) << 8) | diskRead(BPBOffset + 21);
+}
+
+int BPB_MediaType = diskRead(BPBOffset + 10);
+int BPB_SectorsPerFAT = (diskRead(BPBOffset + 12) << 8) | diskRead(BPBOffset + 11);
+
+int FATOffset = partitionOffset + (BPB_BytesPerSector * BPB_ReservedSectors);
+int clusterOffset = FATOffset + (BPB_BytesPerSector * BPB_SectorsPerFAT * BPB_NumFATs);
+int clusterSize = BPB_BytesPerSector * BPB_SectorsPerCluster;
+
+int rootDirStart = clusterOffset;
+
+int readFAT(int clusterNum) {
+  int offset = FATOffset + (clusterNum * 2);
+  __RETURN__ = diskRead(offset + 1) << 8 | diskRead(offset);
+}
+
+void lsDir(int startCluster) {
+  int startOffset = clusterOffset + (startCluster * clusterSize);
+  bool done = false;
+  int i = 0;
+  while(i < clusterSize && !done) {
+    int blockStart = startOffset + i;
+    int attrs = diskRead(blockStart + 11);
+    int blockStartVal = diskRead(blockStart);
+    if(attrs != 15 && blockStartVal != 0 && blockStartVal != 229) {
+      int filename[12];
+      filename[11] = ' ';
+      int n = 0;
+      while(n < 11) {
+        int val = diskRead(blockStart + n);
+        filename[n] = val;
+        n = n + 1;
+      }
+      
+      if(attrs & 16 == 16) {
+        filename[11] = '/';
+      }
+      
+      n = 0;
+      while(n < 12) {
+        printChar(filename[n]);
+        n = n + 1;
+      }
+      printChar(10);
+    }
+    if(!(attrs != 15 && blockStartVal != 0 && blockStartVal != 229)) {
+      if(blockStartVal == 0) {
+        done = true;
+      }
+    }
+    i = i + 32;
+  }
+}
+
+void main() {
+  printChar('h');
+  int testArray[12];
+  testArray[0] = 'a';
+  testArray[1] = 'b';
+  testArray[2] = 'c';
+  
+  int i = 0;
+  while(i <= 2) {
+    printChar(testArray[i]);
+    i = i + 1;
+  }
+  
+  printChar(10);
+  printChar((rootDirStart >> 8) & 255);
+  printChar(rootDirStart & 255);
+  printChar((clusterSize >> 8) & 255);
+  printChar(clusterSize & 255);
+  printChar((BPB_SectorsPerFAT >> 8) & 255);
+  printChar(BPB_SectorsPerFAT & 255);
+  lsDir(0);
+}
+main();

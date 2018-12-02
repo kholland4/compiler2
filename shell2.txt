@@ -1,0 +1,159 @@
+int diskRead(int addr) {
+  asm {
+    chigh 0 0 4
+    clow 0 12 4
+    add 1 4 4
+    load 0 4 5
+    
+    chigh 0 0 4
+    clow 0 2 4
+    busw 4 5 0
+    busr 0 0 5
+    
+    chigh 0 0 4
+    clow 0 16 4
+    add 1 4 4
+    stor 5 4 0
+  }
+}
+void printChar(int char) {
+  asm {
+    chigh 0 0 4
+    clow 0 12 4
+    add 1 4 4
+    load 0 4 5
+    
+    chigh 0 0 4
+    clow 0 0 4
+    busw 4 5 0
+  }
+}
+
+int partitionOffset = 0;
+int BPBOffset = partitionOffset + 11;
+
+int BPB_BytesPerSector = (diskRead(BPBOffset + 1) << 8) | diskRead(BPBOffset);
+int BPB_SectorsPerCluster = diskRead(BPBOffset + 2);
+int BPB_ReservedSectors = (diskRead(BPBOffset + 4) << 8) | diskRead(BPBOffset + 3);
+int BPB_NumFATs = diskRead(BPBOffset + 5);
+int BPB_MaxRootDirEntries = (diskRead(BPBOffset + 7) << 8) | diskRead(BPBOffset + 6);
+
+int BPB_TotalLogicalSectors = (diskRead(BPBOffset + 9) << 8) | diskRead(BPBOffset + 8);
+if(BPB_TotalLogicalSectors == 0) {
+  BPB_TotalLogicalSectors = (diskRead(BPBOffset + 24) << 24) | (diskRead(BPBOffset + 23)) << 16 | (diskRead(BPBOffset + 22) << 8) | diskRead(BPBOffset + 21);
+}
+
+int BPB_MediaType = diskRead(BPBOffset + 10);
+int BPB_SectorsPerFAT = (diskRead(BPBOffset + 12) << 8) | diskRead(BPBOffset + 11);
+
+int FATOffset = partitionOffset + (BPB_BytesPerSector * BPB_ReservedSectors);
+int clusterOffset = FATOffset + (BPB_BytesPerSector * BPB_SectorsPerFAT * BPB_NumFATs);
+int clusterSize = BPB_BytesPerSector * BPB_SectorsPerCluster;
+
+int rootDirStart = clusterOffset;
+
+int readFAT(int clusterNum) {
+  int offset = FATOffset + (clusterNum * 2);
+  __RETURN__ = diskRead(offset + 1) << 8 | diskRead(offset);
+}
+
+void lsDir(int startCluster) {
+  int startOffset = clusterOffset + (startCluster * clusterSize);
+  bool done = false;
+  int i = 0;
+  while((i < clusterSize) && (!done)) {
+    int blockStart = startOffset + i;
+    int attrs = diskRead(blockStart + 11);
+    int blockStartVal = diskRead(blockStart);
+    if((attrs != 15) && (blockStartVal != 0) && (blockStartVal != 229)) {
+      int filename[12];
+      filename[11] = ' ';
+      int n = 0;
+      while(n < 11) {
+        int val = diskRead(blockStart + n);
+        filename[n] = val;
+        n = n + 1;
+      }
+      
+      if(attrs & 16 == 16) {
+        filename[11] = '/';
+      }
+      
+      n = 0;
+      while(n < 12) {
+        printChar(filename[n]);
+        n = n + 1;
+      }
+      printChar(10);
+    }
+    if(!(attrs != 15 && blockStartVal != 0 && blockStartVal != 229)) {
+      if(blockStartVal == 0) {
+        done = true;
+      }
+    }
+    i = i + 32;
+  }
+}
+
+int findFileN[12];
+int findFile(int startCluster) {
+  int startOffset = clusterOffset + (startCluster * clusterSize);
+  bool done = false;
+  int i = 0;
+  while((i < clusterSize) && (!done)) {
+    int blockStart = startOffset + i;
+    int attrs = diskRead(blockStart + 11);
+    int blockStartVal = diskRead(blockStart);
+    if((attrs != 15) && (blockStartVal != 0) && (blockStartVal != 229)) {
+      bool ok = true;
+      int n = 0;
+      while(n < 11) {
+        int val = diskRead(blockStart + n);
+        if((val & 255) != (findFileN[n] & 255)) {
+          ok = false;
+        }
+        n = n + 1;
+      }
+      if(ok) {
+        done = true;
+        __RETURN__ = blockStart;
+      }
+    }
+    i = i + 32;
+  }
+}
+
+void catFile(int entryPtr) {
+  int fileStartCluster = (diskRead(entryPtr + 27) << 8) | diskRead(entryPtr + 26);
+  int fileSize = (diskRead(entryPtr + 31) << 24) | (diskRead(entryPtr + 30) << 16) | (diskRead(entryPtr + 29) << 8) | diskRead(entryPtr + 28);
+  
+  int idx = 0;
+  int currentCluster = fileStartCluster;
+  while(idx < fileSize) {
+    int startPos = clusterOffset + ((currentCluster + 6) * clusterSize);
+    int endPos = 0;
+    if((idx + clusterSize) <= fileSize) {
+      endPos = clusterSize;
+    }
+    if((idx + clusterSize) > fileSize) {
+      endPos = fileSize & 511;
+    }
+    int n = 0;
+    while(n < endPos) {
+      int val = diskRead(startPos + n);
+      printChar(val);
+      n = n + 1;
+    }
+    currentCluster = readFAT(currentCluster);
+    idx = idx + clusterSize;
+  }
+}
+
+void main() {
+  lsDir(0);
+  findFileN[0] = 'T'; findFileN[1] = 'E'; findFileN[2] = 'S'; findFileN[3] = 'T'; findFileN[4] = '2'; findFileN[5] = ' '; findFileN[6] = ' '; findFileN[7] = ' ';
+  findFileN[8] = 'T'; findFileN[9] = 'X'; findFileN[10] = 'T';
+  int entryPtr = findFile(0);
+  catFile(entryPtr);
+}
+main();
