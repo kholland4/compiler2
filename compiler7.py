@@ -493,14 +493,17 @@ def getvar(vars, name):
 #TODO: global arrays
 
 namenumber = ["name", "number", "ptr"]
-def subexpr(mmap, vars, tmp, expr, outptr):
+def subexpr(mmap, vars, tmp, expr, outptr, globalOut = False):
     out = []
     
     if len(expr) == 1 and expr[0].type in namenumber:
         if expr[0].type == "number":
             out.extend(const(expr[0].value, FLAG_GREG))
             out.extend(const(outptr, FLAG_GREG + 1))
-            out.append(ASM("add", FLAG_GREG + 1, FLAG_SPTR, FLAG_GREG + 2))
+            if globalOut:
+                out.append(ASM("add", FLAG_GREG + 1, FLAG_GSPTR, FLAG_GREG + 2))
+            else:
+                out.append(ASM("add", FLAG_GREG + 1, FLAG_SPTR, FLAG_GREG + 2))
             out.append(ASM("stor", FLAG_GREG, FLAG_GREG + 2))
         elif expr[0].type == "name":
             name = expr[0].value
@@ -518,7 +521,10 @@ def subexpr(mmap, vars, tmp, expr, outptr):
                 out.append(ASM("add", FLAG_GREG, FLAG_GREG + 2, FLAG_GREG + 2))
             out.append(ASM("load", 0, FLAG_GREG + 2, FLAG_GREG + 1))
             out.extend(const(outptr, FLAG_GREG))
-            out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 2))
+            if globalOut:
+                out.append(ASM("add", FLAG_GREG, FLAG_GSPTR, FLAG_GREG + 2))
+            else:
+                out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 2))
             out.append(ASM("stor", FLAG_GREG + 1, FLAG_GREG + 2))
             #else:
             #    raise Exception("Variable not found") #FIXME
@@ -528,7 +534,10 @@ def subexpr(mmap, vars, tmp, expr, outptr):
             out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 2))
             out.append(ASM("load", 0, FLAG_GREG + 2, FLAG_GREG + 1))
             out.extend(const(outptr, FLAG_GREG))
-            out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 2))
+            if globalOut:
+                out.append(ASM("add", FLAG_GREG, FLAG_GSPTR, FLAG_GREG + 2))
+            else:
+                out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 2))
             out.append(ASM("stor", FLAG_GREG + 1, FLAG_GREG + 2))
     elif len(expr) == 2 and expr[0].type == "spop" and expr[1].type in namenumber:
         if expr[1].type == "name":
@@ -565,7 +574,10 @@ def subexpr(mmap, vars, tmp, expr, outptr):
             raise Exception("Invalid spop")
         
         out.extend(const(outptr, FLAG_GREG))
-        out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 2))
+        if globalOut:
+            out.append(ASM("add", FLAG_GREG, FLAG_GSPTR, FLAG_GREG + 2))
+        else:
+            out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 2))
         out.append(ASM("stor", FLAG_GREG + 1, FLAG_GREG + 2))
     elif len(expr) == 3 and expr[0].type in namenumber and expr[1].type == "op" and expr[2].type in namenumber:
         if expr[0].type == "name":
@@ -711,7 +723,10 @@ def subexpr(mmap, vars, tmp, expr, outptr):
         #TODO: all ops -------------------------------------------------------------------------------------------------------------------------------------------------------------------------IMPORTANT TODO
         
         out.extend(const(outptr, FLAG_GREG))
-        out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 1))
+        if globalOut:
+            out.append(ASM("add", FLAG_GREG, FLAG_GSPTR, FLAG_GREG + 1))
+        else:
+            out.append(ASM("add", FLAG_GREG, FLAG_SPTR, FLAG_GREG + 1))
         out.append(ASM("stor", FLAG_GREG + 2, FLAG_GREG + 1))
     else:
         #more complex expressions, functions, parenthesis
@@ -809,14 +824,14 @@ def subexpr(mmap, vars, tmp, expr, outptr):
             #TODO: exprs that start with a spop (and other forms?) ------------------------------------------------------------------------------------------------------------------------------IMPORTANT TODO
     return out
 
-def parseExpr(mmap, vars, expr, outptr, tmp = None):
+def parseExpr(mmap, vars, expr, outptr, tmp = None, globalOut = False):
     sTmp = True
     if tmp == None:
         tmp = []
         sTmp = False
     out = []
     
-    out = subexpr(mmap, vars, tmp, expr, outptr)
+    out = subexpr(mmap, vars, tmp, expr, outptr, globalOut)
     
     if not sTmp:
         for ptr in tmp:
@@ -884,7 +899,7 @@ def process(symbols, mmap = [], vars = [], isGlobal = False):
             
             var = getvar(vars, name)
             
-            asm.extend(parseExpr(mmap, vars, expr, var.ptr))
+            asm.extend(parseExpr(mmap, vars, expr, var.ptr, None, var.isGlobal))
         #array index assignment
         elif symbols[i].type == "name" and symbols[i + 1].type == "bracket" and symbols[i + 2].type == "assign":
             name = symbols[i].value

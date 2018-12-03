@@ -28,6 +28,9 @@ void printChar(int char) {
     busw 4 5 0
   }
 }
+void printString() {
+  
+}
 
 int partitionOffset = 0;
 int BPBOffset = partitionOffset + 11;
@@ -52,9 +55,13 @@ int clusterSize = BPB_BytesPerSector * BPB_SectorsPerCluster;
 
 int rootDirStart = clusterOffset;
 
+int findFileN[12];
+int cwd[12];
+int cwdCluster = 0;
+
 int readFAT(int clusterNum) {
   int offset = FATOffset + (clusterNum * 2);
-  __RETURN__ = diskRead(offset + 1) << 8 | diskRead(offset);
+  __RETURN__ = (diskRead(offset + 1) << 8) | diskRead(offset);
 }
 
 void lsDir(int startCluster) {
@@ -95,7 +102,6 @@ void lsDir(int startCluster) {
   }
 }
 
-int findFileN[12];
 int findFile(int startCluster) {
   int startOffset = clusterOffset + (startCluster * clusterSize);
   bool done = false;
@@ -121,6 +127,9 @@ int findFile(int startCluster) {
     }
     i = i + 32;
   }
+  if(!done) {
+    __RETURN__ = 0;
+  }
 }
 
 void catFile(int entryPtr) {
@@ -136,7 +145,7 @@ void catFile(int entryPtr) {
       endPos = clusterSize;
     }
     if((idx + clusterSize) > fileSize) {
-      endPos = fileSize & 511;
+      endPos = fileSize & 2047;
     }
     int n = 0;
     while(n < endPos) {
@@ -149,11 +158,38 @@ void catFile(int entryPtr) {
   }
 }
 
+void cd(int entryPtr) {
+  int fileStartCluster = (diskRead(entryPtr + 27) << 8) | diskRead(entryPtr + 26);
+  int currentCluster = fileStartCluster;
+  if(fileStartCluster != 0) {
+    fileStartCluster = fileStartCluster + 6;
+  }
+  cwdCluster = fileStartCluster;
+}
+
 void main() {
-  lsDir(0);
+  lsDir(cwdCluster);
   findFileN[0] = 'T'; findFileN[1] = 'E'; findFileN[2] = 'S'; findFileN[3] = 'T'; findFileN[4] = '2'; findFileN[5] = ' '; findFileN[6] = ' '; findFileN[7] = ' ';
   findFileN[8] = 'T'; findFileN[9] = 'X'; findFileN[10] = 'T';
-  int entryPtr = findFile(0);
-  catFile(entryPtr);
+  int entryPtr = findFile(cwdCluster);
+  if(entryPtr != 0) {
+    catFile(entryPtr);
+  }
+  
+  findFileN[0] = 'T'; findFileN[1] = 'E'; findFileN[2] = 'S'; findFileN[3] = 'T'; findFileN[4] = 'D'; findFileN[5] = 'I'; findFileN[6] = 'R'; findFileN[7] = ' ';
+  findFileN[8] = ' '; findFileN[9] = ' '; findFileN[10] = ' ';
+  entryPtr = findFile(cwdCluster);
+  if(entryPtr != 0) {
+    cd(entryPtr);
+  }
+  cd(entryPtr);
+  lsDir(cwdCluster);
+  
+  findFileN[0] = 'L'; findFileN[1] = 'O'; findFileN[2] = 'N'; findFileN[3] = 'G'; findFileN[4] = 'F'; findFileN[5] = 'I'; findFileN[6] = 'L'; findFileN[7] = 'E';
+  findFileN[8] = 'T'; findFileN[9] = 'X'; findFileN[10] = 'T';
+  entryPtr = findFile(cwdCluster);
+  if(entryPtr != 0) {
+    catFile(entryPtr);
+  }
 }
 main();
