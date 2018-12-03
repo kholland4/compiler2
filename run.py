@@ -41,15 +41,17 @@ def regwrite(num, data):
 busBuffer = 0
 
 def busw(addr, data):
+    global busBuffer
     if addr == 0: #stdio
-        sys.stdout.write(chr(data))
+        #sys.stdout.write(chr(data))
+        sys.stdout.buffer.write(bytes([data & 255]))
         sys.stdout.flush()
     elif addr == 1: #control
         if data == 0:
             sys.exit()
     elif addr == 2: #disk
-        if addr >= 0 and addr < len(disk):
-            busBuffer = disk[addr]
+        if data >= 0 and data < len(disk):
+            busBuffer = disk[data]
 
 def busr():
     return busBuffer
@@ -120,6 +122,8 @@ while True:
         regwrite(regQ, regread(regA) >> 1)
     elif opcode == 138: #copy
         regwrite(regQ, regread(regA))
+    
+    #print("%d: %3d %3d (%08x) %3d (%08x) %3d (%08x)" % (pos / ilen, opcode, regA, regread(regA), regB, regread(regB), regQ, regread(regQ)))
     
     if increment:
         pos += ilen
